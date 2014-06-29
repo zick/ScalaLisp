@@ -324,9 +324,81 @@ val subrCdr = {(args: LObj) => safeCdr(safeCar(args))}
 
 val subrCons = {(args: LObj) => makeCons(safeCar(args), safeCar(safeCdr(args)))}
 
+val subrEq = {(args: LObj) => {
+  val x = safeCar(args)
+  val y = safeCar(safeCdr(args))
+  (x, y) match {
+    case (Num(n1), Num(n2)) =>
+      if (n1.data == n2.data) sym_t
+      else kNil
+    case _ =>
+      if (x == y) sym_t
+      else kNil
+  }
+}}
+
+val subrAtom = {(args: LObj) => {
+  safeCar(args) match {
+    case Cons(_) => kNil
+    case _ => sym_t
+  }
+}}
+
+val subrNumberp = {(args: LObj) => {
+  safeCar(args) match {
+    case Num(_) => sym_t
+    case _ => kNil
+  }
+}}
+
+val subrSymbolp = {(args: LObj) => {
+  safeCar(args) match {
+    case Sym(_) => sym_t
+    case _ => kNil
+  }
+}}
+
+def subrAddOrMul(fn: (Int, Int) => Int, init_val: Int) = {
+  def doit(args: LObj, ret: Int): LObj = {
+    args match {
+      case Cons(c) => {
+        c.car match {
+          case Num(n) => doit(c.cdr, fn(ret, n.data))
+          case _ => makeError("wrong type")
+        }
+      }
+      case _ => makeNum(ret)
+    }
+  }
+  {(args: LObj) => doit(args, init_val)}
+}
+val subrAdd = subrAddOrMul({(x: Int, y: Int) => x + y}, 0)
+val subrMul = subrAddOrMul({(x: Int, y: Int) => x * y}, 1)
+
+def subrSubOrDivOrMod(fn: (Int, Int) => Int) = {
+  {(args: LObj) =>
+    (safeCar(args), safeCar(safeCdr(args))) match {
+      case (Num(n1), Num(n2)) => makeNum(fn(n1.data, n2.data))
+      case _ => makeError("wrong type")
+    }
+  }
+}
+val subrSub = subrSubOrDivOrMod({(x: Int, y: Int) => x - y})
+val subrDiv = subrSubOrDivOrMod({(x: Int, y: Int) => x / y})
+val subrMod = subrSubOrDivOrMod({(x: Int, y: Int) => x % y})
+
 addToEnv(makeSym("car"), makeSubr(subrCar), g_env)
 addToEnv(makeSym("cdr"), makeSubr(subrCdr), g_env)
 addToEnv(makeSym("cons"), makeSubr(subrCons), g_env)
+addToEnv(makeSym("eq"), makeSubr(subrEq), g_env)
+addToEnv(makeSym("atom"), makeSubr(subrAtom), g_env)
+addToEnv(makeSym("numberp"), makeSubr(subrNumberp), g_env)
+addToEnv(makeSym("symbolp"), makeSubr(subrSymbolp), g_env)
+addToEnv(makeSym("+"), makeSubr(subrAdd), g_env)
+addToEnv(makeSym("*"), makeSubr(subrMul), g_env)
+addToEnv(makeSym("-"), makeSubr(subrSub), g_env)
+addToEnv(makeSym("/"), makeSubr(subrDiv), g_env)
+addToEnv(makeSym("mod"), makeSubr(subrMod), g_env)
 addToEnv(sym_t, sym_t, g_env)
 
 print("> ")
