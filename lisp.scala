@@ -60,6 +60,7 @@ val sym_quote = makeSym("quote")
 val sym_if = makeSym("if")
 val sym_lambda = makeSym("lambda")
 val sym_defun = makeSym("defun")
+val sym_setq = makeSym("setq")
 
 case class Error(obj: Error0) extends LObj
 def makeError(s: String) = Error(new Error0(s))
@@ -262,6 +263,15 @@ def eval(obj: LObj, env: LObj): LObj = {
         val sym = safeCar(args)
         addToEnv(sym, expr, g_env)
         sym
+      }
+      else if (op == sym_setq) {
+        val value = eval(safeCar(safeCdr(args)), env)
+        val sym = safeCar(args)
+        findVar(sym, env) match {
+          case Cons(c) => c.cdr = value
+          case _ => addToEnv(sym, value, g_env)
+        }
+        value
       }
       else
         apply(eval(op, env), evlis(args, env), env)
