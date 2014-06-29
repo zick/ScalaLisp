@@ -55,6 +55,7 @@ def makeSym(s: String) = {
   }
 }
 
+val sym_t = makeSym("t")
 val sym_quote = makeSym("quote")
 
 case class Error(obj: Error0) extends LObj
@@ -184,8 +185,57 @@ def printList(obj: LObj): String = {
   doit(obj, true, "")
 }
 
+def findVar(sym: LObj, env: LObj): LObj = {
+  def doit(alist: LObj): LObj = {
+    alist match {
+      case Cons(c) =>
+        if (safeCar(c.car) == sym)
+          c.car
+        else
+          doit(c.cdr)
+      case _ => kNil
+    }
+  }
+  env match {
+    case Cons(c) => {
+      val x = doit(c.car)
+      if (x == kNil)
+        findVar(sym, c.cdr)
+      else
+        x
+    }
+    case _ => kNil
+  }
+}
+
+val g_env = makeCons(kNil, kNil)
+
+def addToEnv(sym: LObj, value: LObj, env: LObj) {
+  env match {
+    case Cons(c) => c.car = makeCons(makeCons(sym, value), c.car)
+  }
+}
+
+def eval(obj: LObj, env: LObj) = {
+  obj match {
+    case Nil(_) => obj
+    case Num(_) => obj
+    case Error(_) => obj
+    case Sym(s) => {
+      val bind = findVar(obj, env)
+      bind match {
+        case Cons(c) => c.cdr
+        case _ => makeError(s.data + " has no value")
+      }
+    }
+    case _ => makeError("noimpl")
+  }
+}
+
+addToEnv(sym_t, sym_t, g_env)
+
 print("> ")
 for (line <- Source.stdin.getLines) {
-  println(printObj(read(line)._1))
+  println(printObj(eval(read(line)._1, g_env)))
   print("> ")
 }
