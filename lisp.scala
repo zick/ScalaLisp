@@ -57,6 +57,7 @@ def makeSym(s: String) = {
 
 val sym_t = makeSym("t")
 val sym_quote = makeSym("quote")
+val sym_if = makeSym("if")
 
 case class Error(obj: Error0) extends LObj
 def makeError(s: String) = Error(new Error0(s))
@@ -216,7 +217,7 @@ def addToEnv(sym: LObj, value: LObj, env: LObj) {
   }
 }
 
-def eval(obj: LObj, env: LObj) = {
+def eval(obj: LObj, env: LObj): LObj = {
   obj match {
     case Nil(_) => obj
     case Num(_) => obj
@@ -228,10 +229,62 @@ def eval(obj: LObj, env: LObj) = {
         case _ => makeError(s.data + " has no value")
       }
     }
-    case _ => makeError("noimpl")
+    case _ => {
+      val op = safeCar(obj)
+      val args = safeCdr(obj)
+      if (op == sym_quote)
+        safeCar(args)
+      else if (op == sym_if) {
+        val c = eval(safeCar(args), env)
+        c match {
+          case Error(_) => c
+          case Nil(_) => eval(safeCar(safeCdr(safeCdr(args))), env)
+          case _ => eval(safeCar(safeCdr(args)), env)
+        }
+      }
+      else
+        apply(eval(op, env), evlis(args, env), env)
+    }
   }
 }
 
+def evlis(lst: LObj, env: LObj) = {
+  def doit(lst: LObj, ret: LObj): LObj = {
+    lst match {
+      case Cons(c) => {
+        eval(c.car, env) match {
+          case Error(e) => Error(e)
+          case elm => doit(c.cdr, makeCons(elm, ret))
+        }
+      }
+      case _ => nreverse(ret)
+    }
+  }
+  doit(lst, kNil)
+}
+
+def apply(fn: LObj, args: LObj, env: LObj) = {
+  args match {
+    case Error(_) => args
+    case _ => {
+      fn match {
+        case Error(_) => fn
+        case Subr(s) => s.fn(args)
+        case _ => makeError(printObj(fn) + " is not function")
+      }
+    }
+  }
+}
+
+val subrCar = {(args: LObj) => safeCar(safeCar(args))}
+
+val subrCdr = {(args: LObj) => safeCdr(safeCar(args))}
+
+val subrCons = {(args: LObj) => makeCons(safeCar(args), safeCar(safeCdr(args)))}
+
+addToEnv(makeSym("car"), makeSubr(subrCar), g_env)
+addToEnv(makeSym("cdr"), makeSubr(subrCdr), g_env)
+addToEnv(makeSym("cons"), makeSubr(subrCons), g_env)
 addToEnv(sym_t, sym_t, g_env)
 
 print("> ")
