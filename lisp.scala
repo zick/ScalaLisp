@@ -58,6 +58,7 @@ def makeSym(s: String) = {
 val sym_t = makeSym("t")
 val sym_quote = makeSym("quote")
 val sym_if = makeSym("if")
+val sym_lambda = makeSym("lambda")
 
 case class Error(obj: Error0) extends LObj
 def makeError(s: String) = Error(new Error0(s))
@@ -97,6 +98,17 @@ def nreverse(lst: LObj) = {
     }
   }
   doit(lst, kNil)
+}
+
+def pairlis(lst1: LObj, lst2: LObj) = {
+  def doit(lst1: LObj, lst2: LObj, ret: LObj): LObj = {
+    (lst1, lst2) match {
+      case (Cons(c1), Cons(c2)) =>
+        doit(c1.cdr, c2.cdr, makeCons(makeCons(c1.car, c2.car), ret))
+      case _ => nreverse(ret)
+    }
+  }
+  doit(lst1, lst2, kNil)
 }
 
 def isDelimiter(c: Char) = {
@@ -242,6 +254,8 @@ def eval(obj: LObj, env: LObj): LObj = {
           case _ => eval(safeCar(safeCdr(args)), env)
         }
       }
+      else if (op == sym_lambda)
+        makeExpr(args, env)
       else
         apply(eval(op, env), evlis(args, env), env)
     }
@@ -263,6 +277,16 @@ def evlis(lst: LObj, env: LObj) = {
   doit(lst, kNil)
 }
 
+def progn(body: LObj, env: LObj) = {
+  def doit(body: LObj, ret: LObj): LObj = {
+    body match {
+      case Cons(c) => doit(c.cdr, eval(c.car, env))
+      case _ => ret
+    }
+  }
+  doit(body, kNil)
+}
+
 def apply(fn: LObj, args: LObj, env: LObj) = {
   args match {
     case Error(_) => args
@@ -270,6 +294,7 @@ def apply(fn: LObj, args: LObj, env: LObj) = {
       fn match {
         case Error(_) => fn
         case Subr(s) => s.fn(args)
+        case Expr(e) => progn(e.body, makeCons(pairlis(e.args, args), e.env))
         case _ => makeError(printObj(fn) + " is not function")
       }
     }
